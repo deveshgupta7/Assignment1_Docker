@@ -26,8 +26,8 @@ jobs:
         AWS_REGION: us-east-1
 
     - name: Build MySQL Docker Image
-        run:|
-          docker build -t my_db -f Dockerfile_mysql .
+      run: |
+        docker build -t my_db -f Dockerfile_mysql .
 
     - name: Run MySQL Container
       id: run-mysql
