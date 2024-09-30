@@ -10,7 +10,7 @@ RUN apt-get update -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Set the working directory.
+# Set the working directory
 WORKDIR /app
 
 # Copy the current directory contents into the container at /app
