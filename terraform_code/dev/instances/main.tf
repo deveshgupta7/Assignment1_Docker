@@ -36,6 +36,20 @@ module "globalvars" {
   source = "../../modules/globalvars"
 }
 
+# Data source to retrieve existing subnets
+data "aws_subnet" "existing_subnets" {
+  count = 6 # Number of existing subnets you have
+  id = [
+    "subnet-0c93d3f41a21353a6",
+    "subnet-056ab616e14c9ba19",
+    "subnet-0751d20d47e7ae061",
+    "subnet-0ab723aedc1ed23f8",
+    "subnet-0b84452f82e627091",
+    "subnet-0e88d75c5a5a13f1c",
+  ][count.index]
+}
+
+
 # Reference subnet provisioned by 01-Networking 
 resource "aws_instance" "my_amazon" {
   ami                         = data.aws_ami.latest_amazon_linux.id
@@ -43,6 +57,7 @@ resource "aws_instance" "my_amazon" {
   key_name                    = aws_key_pair.my_key.key_name
   vpc_security_group_ids      = [aws_security_group.my_sg.id]
   associate_public_ip_address = true
+  subnet_id                   = data.aws_subnet.existing_subnets[0].id
 
   lifecycle {
     create_before_destroy = true
@@ -139,4 +154,101 @@ resource "aws_ecr_repository" "my_ecr_repo" {
       "Name" = "${local.name_prefix}-ecr"
     }
   )
+}
+
+# Security Group for ALB
+resource "aws_security_group" "alb_sg" {
+  name        = "${local.name_prefix}-alb-sg"
+  description = "Allow traffic to the Application Load Balancer"
+  vpc_id      = data.aws_vpc.default.id # Ensure you have a VPC defined
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allow HTTP traffic from anywhere
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allow HTTPS traffic from anywhere
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"] # Allow all outbound traffic
+  }
+
+  tags = merge(local.default_tags,
+    {
+      "Name" = "${local.name_prefix}-alb-sg" # Tag for identification
+    }
+  )
+}
+
+# Create the Application Load Balancer
+resource "aws_lb" "my_alb" {
+  name               = "${local.name_prefix}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]         # Use the ALB security group
+  subnets            = data.aws_subnet.existing_subnets[*].id # Associate with the existing subnets
+
+  enable_deletion_protection = false
+
+  tags = merge(local.default_tags,
+    {
+      "Name" = "${local.name_prefix}-alb" # Tag for identification
+    }
+  )
+}
+
+# Create a Target Group for your ALB
+resource "aws_lb_target_group" "my_target_group" {
+  name     = "${local.name_prefix}-tg"
+  port     = 80 # Change this if your application runs on a different port
+  protocol = "HTTP"
+  vpc_id   = data.aws_vpc.default.id # Ensure you have a VPC defined
+
+  health_check {
+    path                = "/health" # Change this to your application's health check path
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = merge(local.default_tags,
+    {
+      "Name" = "${local.name_prefix}-tg" # Tag for identification
+    }
+  )
+}
+
+# Create a Listener for the ALB (HTTP)
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.my_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.my_target_group.arn
+  }
+}
+
+# Create a Listener for the ALB (HTTPS) without a certificate
+resource "aws_lb_listener" "https_listener" {
+  load_balancer_arn = aws_lb.my_alb.arn
+  port              = 443
+  protocol          = "HTTPS"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.my_target_group.arn
+  }
 }
