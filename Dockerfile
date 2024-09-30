@@ -4,7 +4,7 @@ FROM ubuntu:20.04
 # Set environment variables to avoid interaction during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update the package list and install dependencies.
+# Update the package list and install dependencies
 RUN apt-get update -y && \
     apt-get install -y python3-pip mysql-client && \
     apt-get clean && \
