@@ -47,16 +47,6 @@ jobs:
       run: |
         docker build -t my_app -f Dockerfile .
 
-    - name: Run Application Container
-      run: |
-        docker run -p 8080:8080 -e DBHOST=${{ env.MYSQL_IP }} -e DBPORT=3306 -e DBUSER=root -e DBPWD=pw my_app
-
-    - name: Wait for Application to Start
-      run: |
-        echo "Pause for 10 seconds to let the application start"
-        sleep 10
-        curl localhost:8080 -vvv
-
     - name: Tag and Push Images to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
