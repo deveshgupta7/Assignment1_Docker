@@ -58,6 +58,7 @@ resource "aws_instance" "my_amazon" {
   vpc_security_group_ids      = [aws_security_group.my_sg.id]
   associate_public_ip_address = true
   subnet_id                   = data.aws_subnet.existing_subnets[0].id
+  iam_instance_profile        = "LabInstanceProfile"
 
   lifecycle {
     create_before_destroy = true
@@ -87,6 +88,33 @@ resource "aws_security_group" "my_sg" {
     description      = "SSH from everywhere"
     from_port        = 22
     to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  ingress {
+    description      = "dockersite one"
+    from_port        = 8081
+    to_port          = 8081
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  ingress {
+    description      = "dockersite two"
+    from_port        = 8082
+    to_port          = 8082
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  ingress {
+    description      = "dockersite three"
+    from_port        = 8083
+    to_port          = 8083
     protocol         = "tcp"
     cidr_blocks      = ["0.0.0.0/0"]
     ipv6_cidr_blocks = ["::/0"]
@@ -175,7 +203,26 @@ resource "aws_security_group" "alb_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"] # Allow HTTPS traffic from anywhere
   }
-
+  
+  ingress {
+    from_port   = 8081
+    to_port     = 8081
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allow HTTPS traffic from anywhere
+  }
+  
+  ingress {
+    from_port   = 8082
+    to_port     = 8082
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allow HTTPS traffic from anywhere
+  }
+  ingress {
+    from_port   = 8083
+    to_port     = 8083
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allow HTTPS traffic from anywhere
+  }
   egress {
     from_port   = 0
     to_port     = 0
@@ -215,7 +262,7 @@ resource "aws_lb_target_group" "my_target_group" {
   vpc_id   = data.aws_vpc.default.id # Ensure you have a VPC defined
 
   health_check {
-    path                = "/health" # Change this to your application's health check path
+    path                = "/health" 
     interval            = 30
     timeout             = 5
     healthy_threshold   = 2
@@ -232,20 +279,8 @@ resource "aws_lb_target_group" "my_target_group" {
 # Create a Listener for the ALB (HTTP)
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.my_alb.arn
-  port              = 80
+  port              = 8081
   protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.my_target_group.arn
-  }
-}
-
-# Create a Listener for the ALB (HTTPS) without a certificate
-resource "aws_lb_listener" "https_listener" {
-  load_balancer_arn = aws_lb.my_alb.arn
-  port              = 443
-  protocol          = "HTTPS"
 
   default_action {
     type             = "forward"
